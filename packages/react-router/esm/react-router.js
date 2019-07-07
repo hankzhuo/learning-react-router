@@ -9,7 +9,7 @@ import pathToRegexp from 'path-to-regexp';
 import _extends from '@babel/runtime/helpers/esm/extends';
 import { isValidElementType } from 'react-is';
 import _objectWithoutPropertiesLoose from '@babel/runtime/helpers/esm/objectWithoutPropertiesLoose';
-import hoistStatics from 'hoist-non-react-statics'; // 防止 React 中 static 被重写
+import hoistStatics from 'hoist-non-react-statics'; // 功能类似于 Object.assign()，但能防止 React 中 static 被重写
 
 // TODO: Replace with React.createContext once we can assume React 16+
 
@@ -20,88 +20,101 @@ var createNamedContext = function createNamedContext(name) {
 };
 
 var context =
-/*#__PURE__*/
-createNamedContext("Router");
+  /*#__PURE__*/
+  createNamedContext("Router");
 
 /**
  * The public API for putting history on context.
  */
-
+// Router 也是 React 组件
 var Router =
-/*#__PURE__*/
-function (_React$Component) {
-  _inheritsLoose(Router, _React$Component);  // Router 从 React.Component 继承属性和方法
+  /*#__PURE__*/
+  function (_React$Component) {
+    _inheritsLoose(Router, _React$Component);  // Router 从 React.Component 原型上的继承属性和方法
 
-  Router.computeRootMatch = function computeRootMatch(pathname) {
-    return {
-      path: "/",
-      url: "/",
-      params: {},
-      isExact: pathname === "/"
+    Router.computeRootMatch = function computeRootMatch(pathname) {
+      return {
+        path: "/",
+        url: "/",
+        params: {},
+        isExact: pathname === "/"
+      };
     };
-  };
 
-  function Router(props) { // Router 是一个类，也是 React 组件
-    var _this;
+    function Router(props) { // 首先定义一个类 Router，也是 React 组件
+      var _this;
 
-    _this = _React$Component.call(this, props) || this;
-    _this.state = {
-      location: props.history.location
+      _this = _React$Component.call(this, props) || this; // 继承自身属性和方法
+      _this.state = {
+        location: props.history.location
+      };
+      // This is a bit of a hack. We have to start listening for location
+      // changes here in the constructor in case there are any <Redirect>s
+      // on the initial render. If there are, they will replace/push when
+      // they mount and since cDM fires in children before parents, we may
+      // get a new location before the <Router> is mounted.
+
+      _this._isMounted = false;
+      _this._pendingLocation = null;
+
+      if (!props.staticContext) {
+        _this.unlisten = props.history.listen((location) => { // 监听 history.location 变化，如果有变化，则更新 locaiton
+          if (_this._isMounted) {
+            _this.setState({
+              location: location
+            });
+          } else {
+            _this._pendingLocation = location;
+          }
+        });
+      }
+
+      return _this;
+    }
+
+    var _proto = Router.prototype;  // 组件需要有生命周期，在原型对象上添加 componentDidMount、componentWillUnmount、render 方法
+
+    _proto.componentDidMount = function componentDidMount() {
+      this._isMounted = true;
+
+      if (this._pendingLocation) {
+        this.setState({
+          location: this._pendingLocation
+        });
+      }
     };
-    // This is a bit of a hack. We have to start listening for location
-    // changes here in the constructor in case there are any <Redirect>s
-    // on the initial render. If there are, they will replace/push when
-    // they mount and since cDM fires in children before parents, we may
-    // get a new location before the <Router> is mounted.
 
-    _this._isMounted = false;
-    _this._pendingLocation = null;
+    _proto.componentWillUnmount = function componentWillUnmount() {
+      if (this.unlisten) this.unlisten();  // 停止监听 location
+    };
 
-    if (!props.staticContext) {
-      _this.unlisten = props.history.listen(function (location) { // 监听 history.location 变化
-        if (_this._isMounted) {
-          _this.setState({
-            location: location
-          });
-        } else {
-          _this._pendingLocation = location;
+    _proto.render = function render() {
+      // 使用了 React Context 传递 history、location、match、staticContext，使得所有子组件都可以获取
+      // const value = {
+      //   history: this.props.history,
+      //   location: this.state.location,
+      //   match: Router.computeRootMatch(this.state.location.pathname),
+      //   staticContext: this.props.staticContext
+      // }
+
+      // return (
+      //   <context.Provider value={value}>
+      //     {this.props.children}
+      //   </context.Provider>
+      // )
+      return React.createElement(context.Provider, {
+        children: this.props.children || null,
+        value: {
+          history: this.props.history,
+          location: this.state.location,
+          match: Router.computeRootMatch(this.state.location.pathname),
+          staticContext: this.props.staticContext // staticRouter 中的 API，不是公用 API
         }
       });
-    }
+    };
 
-    return _this;
-  }
-
-  var _proto = Router.prototype;  // 组件需要有生命周期，在原型对象上添加 componentDidMount、componentWillUnmount、render 方法
-
-  _proto.componentDidMount = function componentDidMount() {
-    this._isMounted = true;
-
-    if (this._pendingLocation) {
-      this.setState({
-        location: this._pendingLocation
-      });
-    }
-  };
-
-  _proto.componentWillUnmount = function componentWillUnmount() {
-    if (this.unlisten) this.unlisten();  // 停止监听 location
-  };
-
-  _proto.render = function render() {
-      return React.createElement(context.Provider, { // 使用了 React Context 方法，传递 history、location、match、staticContext，使得所有子组件都可以获取
-      children: this.props.children || null,
-      value: {
-        history: this.props.history,
-        location: this.state.location,
-        match: Router.computeRootMatch(this.state.location.pathname),
-        staticContext: this.props.staticContext
-      }
-    });
-  };
-
-  return Router;
-}(React.Component);
+    return Router;
+  }(React.Component);
 
 if (process.env.NODE_ENV !== "production") {
   Router.propTypes = {
@@ -120,33 +133,33 @@ if (process.env.NODE_ENV !== "production") {
  */
 
 var MemoryRouter =
-/*#__PURE__*/
-function (_React$Component) {
-  _inheritsLoose(MemoryRouter, _React$Component);
+  /*#__PURE__*/
+  function (_React$Component) {
+    _inheritsLoose(MemoryRouter, _React$Component);
 
-  function MemoryRouter() {
-    var _this;
+    function MemoryRouter() {
+      var _this;
 
-    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-      args[_key] = arguments[_key];
+      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+        args[_key] = arguments[_key];
+      }
+
+      _this = _React$Component.call.apply(_React$Component, [this].concat(args)) || this;
+      _this.history = createMemoryHistory(_this.props); // 创建 Memory history 对象，其他和 BrowserRouter 没有大区别
+      return _this;
     }
 
-    _this = _React$Component.call.apply(_React$Component, [this].concat(args)) || this;
-    _this.history = createMemoryHistory(_this.props); // 创建 Memory history 对象，其他和 BrowserRouter 没有大区别
-    return _this;
-  }
+    var _proto = MemoryRouter.prototype;
 
-  var _proto = MemoryRouter.prototype;
+    _proto.render = function render() {
+      return React.createElement(Router, {
+        history: this.history,
+        children: this.props.children
+      });
+    };
 
-  _proto.render = function render() {
-    return React.createElement(Router, {
-      history: this.history,
-      children: this.props.children
-    });
-  };
-
-  return MemoryRouter;
-}(React.Component);
+    return MemoryRouter;
+  }(React.Component);
 
 if (process.env.NODE_ENV !== "production") {
   MemoryRouter.propTypes = {
@@ -162,59 +175,60 @@ if (process.env.NODE_ENV !== "production") {
   };
 }
 
+// 生命周期：给路由添加生命周期
 var Lifecycle =
-/*#__PURE__*/
-function (_React$Component) {
-  _inheritsLoose(Lifecycle, _React$Component);
+  /*#__PURE__*/
+  function (_React$Component) {
+    _inheritsLoose(Lifecycle, _React$Component);
 
-  function Lifecycle() {
-    return _React$Component.apply(this, arguments) || this;
-  }
+    function Lifecycle() {
+      return _React$Component.apply(this, arguments) || this;
+    }
 
-  var _proto = Lifecycle.prototype;
+    var _proto = Lifecycle.prototype;
+  
+    _proto.componentDidMount = function componentDidMount() {
+      if (this.props.onMount) this.props.onMount.call(this, this);
+    };
 
-  _proto.componentDidMount = function componentDidMount() {
-    if (this.props.onMount) this.props.onMount.call(this, this);
-  };
+    _proto.componentDidUpdate = function componentDidUpdate(prevProps) {
+      if (this.props.onUpdate) this.props.onUpdate.call(this, this, prevProps);
+    };
 
-  _proto.componentDidUpdate = function componentDidUpdate(prevProps) {
-    if (this.props.onUpdate) this.props.onUpdate.call(this, this, prevProps);
-  };
+    _proto.componentWillUnmount = function componentWillUnmount() {
+      if (this.props.onUnmount) this.props.onUnmount.call(this, this);
+    };
 
-  _proto.componentWillUnmount = function componentWillUnmount() {
-    if (this.props.onUnmount) this.props.onUnmount.call(this, this);
-  };
+    _proto.render = function render() {
+      return null;
+    };
 
-  _proto.render = function render() {
-    return null;
-  };
-
-  return Lifecycle;
-}(React.Component);
+    return Lifecycle;
+  }(React.Component);
 
 /**
  * The public API for prompting the user before navigating away from a screen.
  */
-
+// 离开一个页面时候，提示信息组件
 function Prompt(_ref) {
   var message = _ref.message,
-      _ref$when = _ref.when,
-      when = _ref$when === void 0 ? true : _ref$when;
-  
-  return React.createElement(context.Consumer, null, function (context$$1) {
+    _ref$when = _ref.when,
+    when = _ref$when === void 0 ? true : _ref$when; // void 0 === undefined 为 true，解决 undefined 兼容性问题
+
+  return React.createElement(context.Consumer, null, (context$$1) => {
     !context$$1 ? process.env.NODE_ENV !== "production" ? invariant(false, "You should not use <Prompt> outside a <Router>") : invariant(false) : void 0;
-    
+
     if (!when || context$$1.staticContext) return null;
     var method = context$$1.history.block;  // 提示消息的方法
-    
+
     return React.createElement(Lifecycle, {
       onMount: function onMount(self) {
-        self.release = method(message); // 提示消息，返回取消提示方法
+        self.release = method(message); // componentDidMount 时，提示消息，返回”取消提示“方法
       },
       onUpdate: function onUpdate(self, prevProps) {
         if (prevProps.message !== message) {
-          self.release(); // 先取消提示
-          self.release = method(message);
+          self.release(); // 先取消上一次提示方法
+          self.release = method(message);  // 在重新提示消息，并返回取消提示方法
         }
       },
       onUnmount: function onUnmount(self) {
@@ -273,21 +287,21 @@ function generatePath(path, params) {
 
 function Redirect(_ref) {
   var computedMatch = _ref.computedMatch,
-      to = _ref.to,
-      _ref$push = _ref.push,
-      push = _ref$push === void 0 ? false : _ref$push;
-  return React.createElement(context.Consumer, null, function (context$$1) {
+    to = _ref.to,
+    _ref$push = _ref.push,
+    push = _ref$push === void 0 ? false : _ref$push; 
+  return React.createElement(context.Consumer, null, (context$$1) => { // context.Consumer 第三个参数是一个函数
     !context$$1 ? process.env.NODE_ENV !== "production" ? invariant(false, "You should not use <Redirect> outside a <Router>") : invariant(false) : void 0;
-    
+
     var history = context$$1.history,
-        staticContext = context$$1.staticContext;
-    var method = push ? history.push : history.replace;
+      staticContext = context$$1.staticContext;
+    var method = push ? history.push : history.replace; // method 方法：判断是否是替换（replace）当前的 state，还是往 state 堆栈中添加（push)一个新的 state
     var location = createLocation(computedMatch ? typeof to === "string" ? generatePath(to, computedMatch.params) : _extends({}, to, {
       pathname: generatePath(to.pathname, computedMatch.params)
     }) : to); // When rendering in a static context,
     // set the new location immediately.
 
-    if (staticContext) {
+    if (staticContext) { // 当渲染一个静态的 context 时，立即设置新 location
       method(location);
       return null;
     }
@@ -298,7 +312,7 @@ function Redirect(_ref) {
       },
       onUpdate: function onUpdate(self, prevProps) {
         var prevLocation = createLocation(prevProps.to);
-
+        // 触发更新时，对比前后 location 是否相等，不相等，则更新 location
         if (!locationsAreEqual(prevLocation, _extends({}, location, {
           key: prevLocation.key
         }))) {
@@ -357,15 +371,15 @@ function matchPath(pathname, options) {
   }
 
   var _options = options,
-      path = _options.path,
-      _options$exact = _options.exact,
-      exact = _options$exact === void 0 ? false : _options$exact,
-      _options$strict = _options.strict,
-      strict = _options$strict === void 0 ? false : _options$strict,
-      _options$sensitive = _options.sensitive,
-      sensitive = _options$sensitive === void 0 ? false : _options$sensitive;
+    path = _options.path,
+    _options$exact = _options.exact,
+    exact = _options$exact === void 0 ? false : _options$exact,
+    _options$strict = _options.strict,
+    strict = _options$strict === void 0 ? false : _options$strict,
+    _options$sensitive = _options.sensitive,
+    sensitive = _options$sensitive === void 0 ? false : _options$sensitive;
   var paths = [].concat(path);
-  return paths.reduce(function (matched, path) {
+  return paths.reduce((matched, path) => {
     if (!path) return null;
     if (matched) return matched;
 
@@ -374,13 +388,13 @@ function matchPath(pathname, options) {
       strict: strict,
       sensitive: sensitive
     }),
-        regexp = _compilePath.regexp,
-        keys = _compilePath.keys;
+      regexp = _compilePath.regexp,
+      keys = _compilePath.keys;
 
     var match = regexp.exec(pathname);
     if (!match) return null;
     var url = match[0],
-        values = match.slice(1);
+      values = match.slice(1);
     var isExact = pathname === url;
     if (exact && !isExact) return null;
     return {
@@ -390,7 +404,7 @@ function matchPath(pathname, options) {
       // the matched portion of the URL
       isExact: isExact,
       // whether or not we matched exactly
-      params: keys.reduce(function (memo, key, index) {
+      params: keys.reduce((memo, key, index) => {
         memo[key.name] = values[index];
         return memo;
       }, {})
@@ -407,62 +421,62 @@ function isEmptyChildren(children) {
 
 
 var Route =
-/*#__PURE__*/
-function (_React$Component) {
-  _inheritsLoose(Route, _React$Component);
+  /*#__PURE__*/
+  function (_React$Component) {
+    _inheritsLoose(Route, _React$Component);
 
-  function Route() {
-    return _React$Component.apply(this, arguments) || this;
-  }
+    function Route() {
+      return _React$Component.apply(this, arguments) || this;
+    }
 
-  var _proto = Route.prototype;
+    var _proto = Route.prototype;
 
-  _proto.render = function render() {
-    var _this = this;
-    // context.Consumer 每个 Route 组件都可以消费 Provider 提供的 context
-    return React.createElement(context.Consumer, null, function (context$$1) {
-      !context$$1 ? process.env.NODE_ENV !== "production" ? invariant(false, "You should not use <Route> outside a <Router>") : invariant(false) : void 0;
-      
-      var location = _this.props.location || context$$1.location;
-      var match = _this.props.computedMatch ? _this.props.computedMatch // <Switch> already computed the match for us
-      : _this.props.path ? matchPath(location.pathname, _this.props) : context$$1.match;
+    _proto.render = function render() {
+      var _this = this;
+      // context.Consumer 每个 Route 组件都可以消费 Provider 提供的 context
+      return React.createElement(context.Consumer, null, function (context$$1) {
+        !context$$1 ? process.env.NODE_ENV !== "production" ? invariant(false, "You should not use <Route> outside a <Router>") : invariant(false) : void 0;
 
-      var props = _extends({}, context$$1, { // 处理用 context 传递的还是自己传递的 location 和 match
-        location: location,
-        match: match
-      });
+        var location = _this.props.location || context$$1.location;
+        var match = _this.props.computedMatch ? _this.props.computedMatch // <Switch> already computed the match for us
+          : _this.props.path ? matchPath(location.pathname, _this.props) : context$$1.match;
 
-      var _this$props = _this.props,
+        var props = _extends({}, context$$1, { // 处理用 context 传递的还是自己传递的 location 和 match
+          location: location,
+          match: match
+        });
+
+        var _this$props = _this.props,
           children = _this$props.children,
           component = _this$props.component,
           render = _this$props.render; // Preact uses an empty array as children by
-      // default, so use null if that's the case.
+        // default, so use null if that's the case.
 
-      if (Array.isArray(children) && children.length === 0) {
-        children = null;
-      }
-
-      if (typeof children === "function") {
-        children = children(props);
-
-        if (children === undefined) {
-          if (process.env.NODE_ENV !== "production") {
-            var path = _this.props.path;
-            process.env.NODE_ENV !== "production" ? warning(false, "You returned `undefined` from the `children` function of " + ("<Route" + (path ? " path=\"" + path + "\"" : "") + ">, but you ") + "should have returned a React element or `null`") : void 0;
-          }
-
+        if (Array.isArray(children) && children.length === 0) {
           children = null;
         }
-      }
 
-      return React.createElement(context.Provider, { // Route 内定义一个 Provider
-        value: props
-      }, children && !isEmptyChildren(children) ? children : props.match ? component ? React.createElement(component, props) : render ? render(props) : null : null);
-    });
-  };
+        if (typeof children === "function") {
+          children = children(props);
 
-  return Route;
-}(React.Component);
+          if (children === undefined) {
+            if (process.env.NODE_ENV !== "production") {
+              var path = _this.props.path;
+              process.env.NODE_ENV !== "production" ? warning(false, "You returned `undefined` from the `children` function of " + ("<Route" + (path ? " path=\"" + path + "\"" : "") + ">, but you ") + "should have returned a React element or `null`") : void 0;
+            }
+
+            children = null;
+          }
+        }
+
+        return React.createElement(context.Provider, { // Route 内定义一个 Provider，给 children 传递 props
+          value: props
+        }, children && !isEmptyChildren(children) ? children : props.match ? component ? React.createElement(component, props) : render ? render(props) : null : null);
+      });
+    };
+
+    return Route;
+  }(React.Component);
 
 if (process.env.NODE_ENV !== "production") {
   Route.propTypes = {
@@ -522,7 +536,7 @@ function staticHandler(methodName) {
   };
 }
 
-function noop() {}
+function noop() { }
 /**
  * The public top-level API for a "static" <Router>, so-called because it
  * can't actually change the current location. Instead, it just records
@@ -530,55 +544,55 @@ function noop() {}
  * server-rendering scenarios.
  */
 
-
+// 此 API 用于 SSR 中，从不会改变 location
 var StaticRouter =
-/*#__PURE__*/
-function (_React$Component) {
-  _inheritsLoose(StaticRouter, _React$Component);
+  /*#__PURE__*/
+  function (_React$Component) {
+    _inheritsLoose(StaticRouter, _React$Component);
 
-  function StaticRouter() {
-    var _this;
+    function StaticRouter() {
+      var _this;
 
-    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-      args[_key] = arguments[_key];
+      for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+        args[_key] = arguments[_key];
+      }
+
+      _this = _React$Component.call.apply(_React$Component, [this].concat(args)) || this;
+
+      _this.handlePush = function (location) {
+        return _this.navigateTo(location, "PUSH");
+      };
+
+      _this.handleReplace = function (location) {
+        return _this.navigateTo(location, "REPLACE");
+      };
+
+      _this.handleListen = function () {
+        return noop;
+      };
+
+      _this.handleBlock = function () {
+        return noop;
+      };
+
+      return _this;
     }
 
-    _this = _React$Component.call.apply(_React$Component, [this].concat(args)) || this;
+    var _proto = StaticRouter.prototype;
 
-    _this.handlePush = function (location) {
-      return _this.navigateTo(location, "PUSH");
-    };
-
-    _this.handleReplace = function (location) {
-      return _this.navigateTo(location, "REPLACE");
-    };
-
-    _this.handleListen = function () {
-      return noop;
-    };
-
-    _this.handleBlock = function () {
-      return noop;
-    };
-
-    return _this;
-  }
-
-  var _proto = StaticRouter.prototype;
-
-  _proto.navigateTo = function navigateTo(location, action) {
-    var _this$props = this.props,
+    _proto.navigateTo = function navigateTo(location, action) {
+      var _this$props = this.props,
         _this$props$basename = _this$props.basename,
         basename = _this$props$basename === void 0 ? "" : _this$props$basename,
         _this$props$context = _this$props.context,
         context = _this$props$context === void 0 ? {} : _this$props$context;
-    context.action = action;
-    context.location = addBasename(basename, createLocation(location));
-    context.url = createURL(context.location);
-  };
+      context.action = action;
+      context.location = addBasename(basename, createLocation(location));
+      context.url = createURL(context.location);
+    };
 
-  _proto.render = function render() {
-    var _this$props2 = this.props,
+    _proto.render = function render() {
+      var _this$props2 = this.props,
         _this$props2$basename = _this$props2.basename,
         basename = _this$props2$basename === void 0 ? "" : _this$props2$basename,
         _this$props2$context = _this$props2.context,
@@ -587,28 +601,28 @@ function (_React$Component) {
         location = _this$props2$location === void 0 ? "/" : _this$props2$location,
         rest = _objectWithoutPropertiesLoose(_this$props2, ["basename", "context", "location"]);
 
-    var history = {
-      createHref: function createHref(path) {
-        return addLeadingSlash(basename + createURL(path));
-      },
-      action: "POP",
-      location: stripBasename(basename, createLocation(location)),
-      push: this.handlePush,
-      replace: this.handleReplace,
-      go: staticHandler("go"),
-      goBack: staticHandler("goBack"),
-      goForward: staticHandler("goForward"),
-      listen: this.handleListen,
-      block: this.handleBlock
+      var history = {
+        createHref: function createHref(path) {
+          return addLeadingSlash(basename + createURL(path));
+        },
+        action: "POP",
+        location: stripBasename(basename, createLocation(location)),
+        push: this.handlePush,
+        replace: this.handleReplace,
+        go: staticHandler("go"),
+        goBack: staticHandler("goBack"),
+        goForward: staticHandler("goForward"),
+        listen: this.handleListen,
+        block: this.handleBlock
+      };
+      return React.createElement(Router, _extends({}, rest, {
+        history: history,
+        staticContext: context  // 此处 context 是一个普通 JavaScript 对象
+      }));
     };
-    return React.createElement(Router, _extends({}, rest, {
-      history: history,
-      staticContext: context
-    }));
-  };
 
-  return StaticRouter;
-}(React.Component);
+    return StaticRouter;
+  }(React.Component);
 
 if (process.env.NODE_ENV !== "production") {
   StaticRouter.propTypes = {
@@ -626,46 +640,46 @@ if (process.env.NODE_ENV !== "production") {
  * The public API for rendering the first <Route> that matches.
  */
 
-var Switch =
-/*#__PURE__*/
-function (_React$Component) {
-  _inheritsLoose(Switch, _React$Component);
+ var Switch =
+  /*#__PURE__*/
+  function (_React$Component) {
+    _inheritsLoose(Switch, _React$Component);
 
-  function Switch() {
-    return _React$Component.apply(this, arguments) || this;
-  }
+    function Switch() {
+      return _React$Component.apply(this, arguments) || this;
+    }
 
-  var _proto = Switch.prototype;
+    var _proto = Switch.prototype;
 
-  _proto.render = function render() {
-    var _this = this;
+    _proto.render = function render() {
+      var _this = this;
 
-    return React.createElement(context.Consumer, null, function (context$$1) {
-      !context$$1 ? process.env.NODE_ENV !== "production" ? invariant(false, "You should not use <Switch> outside a <Router>") : invariant(false) : void 0;
-      var location = _this.props.location || context$$1.location;
-      var element, match; // We use React.Children.forEach instead of React.Children.toArray().find()
-      // here because toArray adds keys to all child elements and we do not want
-      // to trigger an unmount/remount for two <Route>s that render the same
-      // component at different URLs.
-
-      React.Children.forEach(_this.props.children, function (child) {
-        if (match == null && React.isValidElement(child)) {
-          element = child;
-          var path = child.props.path || child.props.from;
-          match = path ? matchPath(location.pathname, _extends({}, child.props, {
-            path: path
-          })) : context$$1.match;
-        }
+      return React.createElement(context.Consumer, null, function (context$$1) {
+        !context$$1 ? process.env.NODE_ENV !== "production" ? invariant(false, "You should not use <Switch> outside a <Router>") : invariant(false) : void 0;
+        var location = _this.props.location || context$$1.location;
+        var element, match; // We use React.Children.forEach instead of React.Children.toArray().find()
+        // here because toArray adds keys to all child elements and we do not want
+        // to trigger an unmount/remount for two <Route>s that render the same
+        // component at different URLs.
+        // 只会匹配第一个 child 中 url
+        React.Children.forEach(_this.props.children, function (child) {
+          if (match == null && React.isValidElement(child)) {
+            element = child;
+            var path = child.props.path || child.props.from;
+            match = path ? matchPath(location.pathname, _extends({}, child.props, {
+              path: path
+            })) : context$$1.match;
+          }
+        });
+        return match ? React.cloneElement(element, {
+          location: location, 
+          computedMatch: match  // 加强版的 match
+        }) : null;
       });
-      return match ? React.cloneElement(element, {
-        location: location,
-        computedMatch: match
-      }) : null;
-    });
-  };
+    };
 
-  return Switch;
-}(React.Component);
+    return Switch;
+  }(React.Component);
 
 if (process.env.NODE_ENV !== "production") {
   Switch.propTypes = {
@@ -688,7 +702,7 @@ function withRouter(Component) {
 
   var C = function C(props) {
     var wrappedComponentRef = props.wrappedComponentRef,
-        remainingProps = _objectWithoutPropertiesLoose(props, ["wrappedComponentRef"]);
+      remainingProps = _objectWithoutPropertiesLoose(props, ["wrappedComponentRef"]);
 
     return React.createElement(context.Consumer, null, function (context$$1) {
       !context$$1 ? process.env.NODE_ENV !== "production" ? invariant(false, "You should not use <" + displayName + " /> outside a <Router>") : invariant(false) : void 0;

@@ -25,7 +25,7 @@ function (_React$Component) {
       args[_key] = arguments[_key];
     }
 
-    _this = _React$Component.call.apply(_React$Component, [this].concat(args)) || this;
+    _this = _React$Component.call.apply(_React$Component, [this].concat(args)) || this; // 继承自身属性和方法
     _this.history = createBrowserHistory(_this.props); // 创建 browser history 对象，是支持 HTML 5 的 history API
     return _this;
   }
@@ -33,7 +33,7 @@ function (_React$Component) {
   var _proto = BrowserRouter.prototype;
 
   _proto.render = function render() {
-    return React.createElement(Router, { // 以 Router 为 element，history 和 children 作为Router 的 props
+    return React.createElement(Router, { // 以 Router 为 element，history 和 children 作为 Router 的 props
       history: this.history,
       children: this.props.children
     });
@@ -60,7 +60,7 @@ if (process.env.NODE_ENV !== "production") {
  * The public API for a <Router> that uses window.location.hash.
  */
 
-var HashRouter =
+var HashRouter = 
 /*#__PURE__*/
 function (_React$Component) {
   _inheritsLoose(HashRouter, _React$Component);
@@ -155,6 +155,7 @@ function Link(_ref2) { // ref2
       rest = _objectWithoutPropertiesLoose(_ref2, ["component", "replace", "to"]);
 
   // __RouterContext.Consumer == context.Consumer
+  // eslint-disable-next-line prefer-arrow-callback
   return React.createElement(__RouterContext.Consumer, null, function (context) {
     !context ? process.env.NODE_ENV !== "production" ? invariant(false, "You should not use <Link> outside a <Router>") : invariant(false) : void 0;
 
@@ -191,6 +192,7 @@ function joinClassnames() {
     classnames[_key] = arguments[_key];
   }
 
+  // eslint-disable-next-line prefer-arrow-callback
   return classnames.filter(function (i) {
     return i;
   }).join(" ");
@@ -215,6 +217,7 @@ function NavLink(_ref) {
       to = _ref.to,
       rest = _objectWithoutPropertiesLoose(_ref, ["aria-current", "activeClassName", "activeStyle", "className", "exact", "isActive", "location", "strict", "style", "to"]);
 
+  // eslint-disable-next-line prefer-arrow-callback
   return React.createElement(__RouterContext.Consumer, null, function (context) {
     !context ? process.env.NODE_ENV !== "production" ? invariant(false, "You should not use <NavLink> outside a <Router>") : invariant(false) : void 0;
     var currentLocation = locationProp || context.location;
